@@ -579,6 +579,7 @@ where
 pub struct TryMap<A, OA, F> {
     pub(crate) parser: A,
     pub(crate) mapper: F,
+    pub(crate) override_errors: bool,
     #[allow(dead_code)]
     pub(crate) phantom: EmptyPhantom<OA>,
 }
@@ -589,6 +590,7 @@ impl<A: Clone, OA, F: Clone> Clone for TryMap<A, OA, F> {
         Self {
             parser: self.parser.clone(),
             mapper: self.mapper.clone(),
+            override_errors: self.override_errors,
             phantom: EmptyPhantom::new(),
         }
     }
@@ -609,7 +611,11 @@ where
         match (self.mapper)(out, span) {
             Ok(out) => Ok(M::bind(|| out)),
             Err(err) => {
-                inp.add_alt_err(inp.offset().offset, err);
+                if !self.override_errors {
+                    inp.add_alt_err(inp.offset().offset, err);
+                } else {
+                    inp.errors.alt = Some(Located::at(inp.offset().offset, err));
+                }
                 Err(())
             }
         }

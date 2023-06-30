@@ -724,6 +724,40 @@ pub trait Parser<'a, I: Input<'a>, O, E: ParserExtra<'a, I> = extra::Default>:
         TryMap {
             parser: self,
             mapper: f,
+            override_errors: false,
+            phantom: EmptyPhantom::new(),
+        }
+    }
+
+    /// After a successful parse, apply a fallible function to the output. If the function produces an error, treat it
+    /// as a parsing error and replace any existing error generated.
+    ///
+    /// If you wish parsing of this pattern to continue when an error is generated instead of halting, consider using
+    /// [`Parser::validate`] instead.
+    ///
+    /// The output type of this parser is `U`, the [`Ok`] return value of the function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use chumsky::prelude::*;
+    /// let byte = text::digits::<_, _, extra::Err<Rich<char>>>(10)
+    ///     .slice()
+    ///     .try_map_override(|s: &str, span| s
+    ///         .parse::<u8>()
+    ///         .map_err(|e| Rich::custom(span, e)));
+    ///
+    /// assert!(byte.parse("255").has_output());
+    /// assert!(byte.parse("256").has_errors()); // Out of range
+    /// ```
+    fn try_map_override<U, F: Fn(O, I::Span) -> Result<U, E::Error>>(self, f: F) -> TryMap<Self, O, F>
+    where
+        Self: Sized,
+    {
+        TryMap {
+            parser: self,
+            mapper: f,
+            override_errors: true,
             phantom: EmptyPhantom::new(),
         }
     }
